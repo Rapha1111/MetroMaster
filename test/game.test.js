@@ -171,3 +171,19 @@ test('ouvrir 10 paquets pour 500 Navigos', async () => {
   assert.equal(Object.values(r.user.cards).reduce((a, b) => a + b, 0), 50);
   await assert.rejects(game.buyPack('tenpack', 10), /500 Navigos/);
 });
+
+test('envoyer une carte à un joueur', async () => {
+  const { game, store } = setup();
+  await game.register('giver', 'secret1'); await game.register('Taker', 'secret1');
+  const u = await store.get('user:giver'); u.cards = { simplon: 1, vavin: 2 }; u.favs = { simplon: 1 }; await store.set('user:giver', u);
+  await assert.rejects(game.sendCard('giver', 'simplon', 'giver'), /toi-même/);
+  await assert.rejects(game.sendCard('giver', 'simplon', 'personne'), /Aucun joueur/);
+  await assert.rejects(game.sendCard('giver', 'nation', 'taker'), /pas assez/);
+  const r = await game.sendCard('giver', 'simplon', 'taker');
+  assert.equal(r.to, 'Taker');
+  assert.equal(r.user.cards.simplon, undefined);
+  assert.equal(r.user.favs.simplon, undefined);
+  const t = await game.me('Taker');
+  assert.equal(t.cards.simplon, 1);
+  assert.match(t.log[0].msg, /giver/);
+});

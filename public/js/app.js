@@ -288,6 +288,7 @@ function detail(id) {
       <div class="stat"><b>${r.scrap}</b><span>Navigos si défaussée</span></div></div>
     ${q ? `<div class="actions-col">
       <button class="btn primary" data-sell="${id}">Mettre aux enchères</button>
+      <button class="btn" data-send="${id}">🎁 Envoyer à un joueur</button>
       <button class="btn danger" data-scrap="${id}" data-n="1">Défausser 1 exemplaire (+${r.scrap} N)</button>
       ${q > 1 ? `<button class="btn danger" data-scrap="${id}" data-n="${q - 1}">Défausser les ${q - 1} doublons (+${r.scrap * (q - 1)} N)</button>` : ''}</div>`
       : '<p class="hint" style="text-align:center">Tu ne possèdes pas encore cette gare. Tente ta chance au tirage ou aux enchères !</p><div class="actions-col"><button class="btn" data-goto-auc>Voir les enchères</button></div>'}`);
@@ -451,6 +452,20 @@ document.addEventListener('click', async (e) => {
   if (d.confirmSell) {
     const r = await act(() => api('/auctions', { id: d.confirmSell, minPrice: $('#mp').value, duration: Number($('#dur').value) }));
     if (r) { setUser(r.user); closeModal(); toast('Enchère lancée !', 'ok'); S.tab = 'auctions'; S.aucTab = 'mine'; await loadMarket(); render(); } return;
+  }
+  if (d.send) {
+    const st = stationOf(d.send);
+    return modal(`<h3 style="margin:6px 40px 12px 0">Envoyer une gare</h3><div style="max-width:150px;margin:0 auto 12px">${cardHTML(d.send, { attr: 'data-none' })}</div>
+      <p class="hint" style="text-align:center">1 exemplaire de <b>${esc(st.name)}</b> sera donné, sans contrepartie.</p>
+      <label for="to">Pseudo du destinataire</label><input id="to" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20">
+      <div style="height:12px"></div><button class="btn primary block" data-confirm-send="${d.send}">Envoyer</button>`);
+  }
+  if (d.confirmSend) {
+    const to = $('#to').value.trim(), q = owned()[d.confirmSend] || 0;
+    if (!to) return toast('Saisis un pseudo.', 'err');
+    if (q <= 1 && !confirm(`C'est ton dernier exemplaire de ${stationOf(d.confirmSend).name}. L'envoyer à ${to} ?`)) return;
+    const r = await act(() => api('/send', { id: d.confirmSend, to }));
+    if (r) { setUser(r.user); closeModal(); toast(`🎁 Envoyée à ${r.to} !`, 'ok'); render(); } return;
   }
   if (d.bid) return bidModal(Number(d.bid));
   if (d.confirmBid) {
