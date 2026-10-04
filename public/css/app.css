@@ -241,3 +241,17 @@ label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 6px
 .spinner { width: 28px; height: 28px; border: 3px solid #ffffff22; border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; margin: 40px auto; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+.bullet.tram { border-radius: 6px; width: auto; min-width: 26px; padding: 0 4px; }
+.bullet.tram.lg { min-width: 46px; font-size: 17px; }
+.art .bullet.tram { width: auto; height: 32cqw; min-width: 38cqw; padding: 0 5cqw; font-size: 18cqw; border-radius: 4cqw; }
+.pack { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.pack .flip { width: 100%; margin: 0; }
+.pack .flip .card { padding: 6px; gap: 4px; border-radius: 12px; }
+.pack .flip .card .bullets, .pack .flip .card .card-top { display: none; }
+.pack .flip .plaque { padding: 3px; border-width: 2px; }
+.pack .flip .plaque span { font-size: 11cqw; }
+.pack .flip:nth-child(4) { grid-column: 1 / span 1; }
+.newtag { position: absolute; top: -6px; right: -6px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 900; padding: 2px 6px; border-radius: 8px; z-index: 3; }
+.flip-in .front { position: absolute; }
+@media (min-width: 520px) { .modal:has(.pack) { max-width: 560px; } .pack { grid-template-columns: repeat(5, 1fr); } }

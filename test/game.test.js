@@ -8,21 +8,23 @@ const { STATIONS } = require('../lib/metro');
 const H = 3600 * 1000;
 function setup() {
   let now = 1_000_000_000_000;
-  const game = createGame(new MemoryStore(null), () => now);
-  return { game, advance: (ms) => { now += ms; } };
+  const store = new MemoryStore(null);
+  const game = createGame(store, () => now);
+  return { game, store, advance: (ms) => { now += ms; } };
 }
 
 test('rareté selon le nombre de lignes', () => {
   assert.equal(STATIONS.chatelet.rarity, 'legendaire');
-  assert.equal(STATIONS.nation.rarity, 'super-rare');
+  assert.equal(STATIONS['charles-de-gaulle-etoile'].rarity, 'super-rare');
   assert.equal(STATIONS.opera.rarity, 'rare');
-  assert.equal(STATIONS['gare-de-lyon'].rarity, 'peu-commune');
+  assert.equal(STATIONS.bercy.rarity, 'peu-commune');
   assert.equal(STATIONS.simplon.rarity, 'commune');
 });
 
 test('une gare par heure', async () => {
   const { game, advance } = setup();
   await game.register('alice', 'secret1');
+  await game.open('alice');
   await game.open('alice');
   await assert.rejects(game.open('alice'), /Pas encore/);
   advance(H - 1);
@@ -38,6 +40,7 @@ test('une gare par heure', async () => {
 test('défonce contre des Navigos', async () => {
   const { game } = setup();
   await game.register('bob', 'secret1');
+  await game.open('bob');
   const before = await game.me('bob');
   const [id, q] = Object.entries(before.cards)[0];
   const r = await game.scrap('bob', id, q);
@@ -47,31 +50,53 @@ test('défonce contre des Navigos', async () => {
 });
 
 test('enchère : surenchère, remboursement, vente, prix moyen', async () => {
-  const { game, advance } = setup();
-  await game.register('seller', 'secret1');
-  await game.register('bidder1', 'secret1');
-  await game.register('bidder2', 'secret1');
-  const s = await game.me('seller');
-  const id = Object.keys(s.cards)[0];
+  const { game, store, advance } = setup();
+  const bal = async (n) => (await game.me(n)).navigos;
+  for (const n of ['seller', 'bidder1', 'bidder2']) { await game.register(n, 'secret1'); await game.open(n); await game.open(n); }
+  for (const n of ['bidder1', 'bidder2']) { const u = await store.get(`user:${n}`); u.navigos = 100; await store.set(`user:${n}`, u); }
+  const [b1, b2, bs] = [await bal('bidder1'), await bal('bidder2'), await bal('seller')];
+  const id = Object.keys((await game.me('seller')).cards)[0];
   const { auction } = await game.createAuction('seller', id, 10);
   await assert.rejects(game.bid('bidder1', auction.id, 9), /minimale/);
   await assert.rejects(game.bid('seller', auction.id, 20), /propre/);
   await game.bid('bidder1', auction.id, 20);
-  assert.equal((await game.me('bidder1')).navigos, 80);
+  assert.equal(await bal('bidder1'), b1 - 20);
   await assert.rejects(game.bid('bidder2', auction.id, 20), /minimale/);
   await game.bid('bidder2', auction.id, 30);
-  assert.equal((await game.me('bidder1')).navigos, 100);
+  assert.equal(await bal('bidder1'), b1);
   advance(24 * H + 1);
   const m = await game.market();
   assert.equal(m.auctions.length, 0);
   assert.equal(m.prices[id].avg, 30);
-  assert.equal((await game.me('seller')).navigos, 100 + 29);
+  assert.equal(await bal('seller'), bs + 29);
   assert.ok((await game.me('bidder2')).cards[id] >= 1);
+});
+
+test('inscription : 2 paquets de 5 gares, 0 Navigo', async () => {
+  const { game } = setup();
+  const { user } = await game.register('newbie', 'secret1');
+  assert.equal(user.navigos, 0);
+  assert.equal(user.charges, 2);
+  const r = await game.open('newbie');
+  assert.equal(r.cards.length, 5);
+});
+
+test('succès : finir une ligne rapporte des Navigos', async () => {
+  const store = new MemoryStore(null);
+  const game = createGame(store, () => 1_000_000_000_000);
+  await game.register('lineman', 'secret1');
+  const u = await store.get('user:lineman');
+  for (const id of require('../lib/metro').LINES['3bis'].routes.flat()) u.cards[id] = 1;
+  await store.set('user:lineman', u);
+  const r = await game.open('lineman');
+  assert.equal(r.newAch, 1);
+  assert.ok(r.user.ach.line);
 });
 
 test('enchère sans enchérisseur : la carte revient', async () => {
   const { game, advance } = setup();
   await game.register('carol', 'secret1');
+  await game.open('carol');
   const id = Object.keys((await game.me('carol')).cards)[0];
   const n = (await game.me('carol')).cards[id];
   await game.createAuction('carol', id, 5);

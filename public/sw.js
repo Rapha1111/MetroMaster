@@ -1,4 +1,4 @@
-const CACHE = 'metromaster-v1';
+const CACHE = 'metromaster-v2';
 const SHELL = ['/', '/css/app.css', '/js/app.js', '/icons/icon.svg'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {

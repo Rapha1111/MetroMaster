@@ -5,7 +5,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const S = {
   token: null, user: null, cat: null, market: null, skew: 0,
   tab: 'home', auth: 'login',
-  col: { q: '', rarity: 'all', line: 'all', own: 'all', sort: 'rarity' },
+  col: { q: '', rarity: 'all', net: 'all', line: 'all', own: 'all', sort: 'rarity', limit: 60 },
   openLines: new Set(), aucTab: 'all', aucQ: '',
 };
 try { S.token = localStorage.getItem('mm_token'); S.tab = localStorage.getItem('mm_tab') || 'home'; } catch {}
@@ -45,7 +45,7 @@ function left(ms) {
 }
 const bullet = (l, lg) => {
   const L = S.cat.lines[l];
-  return `<span class="bullet ${l.includes('bis') ? 'b-bis' : ''} ${lg ? 'lg' : ''}" style="background:${L.color};color:${L.text}">${l.replace('bis', 'b')}</span>`;
+  return `<span class="bullet ${l.includes('bis') ? 'b-bis' : ''} ${L.network === 'tram' ? 'tram' : ''} ${lg ? 'lg' : ''}" style="background:${L.color};color:${L.text}">${l.replace('bis', 'b')}</span>`;
 };
 const navi = (n) => `<span class="price"><span class="navigo">N</span>${fmt(n)}</span>`;
 
@@ -116,7 +116,7 @@ function viewHome(v) {
   v.innerHTML = `
   <section class="panel hero">
     <div class="ring" id="ring"><div><div class="t" id="ringT">…</div><div class="s" id="ringS"></div></div></div>
-    <button class="btn primary" id="openBtn" style="min-width:230px;font-size:18px;padding:15px 22px">Tirer une gare</button>
+    <button class="btn primary" id="openBtn" style="min-width:230px;font-size:18px;padding:15px 22px">Ouvrir un paquet</button>
     <p class="hint" style="margin:12px 0 0" id="stock"></p>
   </section>
   <div class="section-title"><h2>Ta progression</h2></div>
@@ -132,7 +132,7 @@ function viewHome(v) {
         const tot = S.cat.rarities.reduce((a, x) => a + x.weight, 0);
         const n = S.cat.stations.filter((s) => s.rarity === r.id).length;
         return `<div><i style="background:${r.color}"></i><b>${r.label}</b><span class="muted">${n} gares</span><em>${(r.weight / tot * 100).toFixed(1)} %</em></div>`;
-      }).join('')}<p class="hint" style="margin:6px 0 0">Plus une gare est desservie par de lignes, plus elle est rare : 1 ligne = commune, 2 = peu commune, 3 = rare, 4 = super rare, 5 = légendaire.</p></div></div>
+      }).join('')}<p class="hint" style="margin:6px 0 0">Plus une gare est desservie par de lignes (métro, RER, Transilien, tram), plus elle est rare : 1 ligne = commune, 2 = peu commune, 3 = rare, 4 = super rare, 5 et plus = légendaire. Chaque paquet contient 5 gares.</p></div></div>
     <div><div class="section-title"><h2>Activité récente</h2></div>${logHTML(u.log.slice(0, 5))}</div>
   </div>`;
 }
@@ -147,6 +147,7 @@ function viewCards(v) {
   const rarOrder = S.cat.rarities.map((r) => r.id);
   let list = S.cat.stations.filter((s) => {
     if (f.rarity !== 'all' && s.rarity !== f.rarity) return false;
+    if (f.net !== 'all' && !s.lines.some((l) => S.cat.lines[l].network === f.net)) return false;
     if (f.line !== 'all' && !s.lines.includes(f.line)) return false;
     if (f.own === 'own' && !owned()[s.id]) return false;
     if (f.own === 'missing' && owned()[s.id]) return false;
@@ -169,20 +170,24 @@ function viewCards(v) {
       <select id="sort" style="width:auto"><option value="rarity" ${f.sort === 'rarity' ? 'selected' : ''}>Rareté</option><option value="name" ${f.sort === 'name' ? 'selected' : ''}>A → Z</option><option value="qty" ${f.sort === 'qty' ? 'selected' : ''}>Quantité</option></select></div>
     <div class="chips">${[['all', 'Toutes'], ['own', 'Possédées'], ['missing', 'Manquantes'], ['dup', 'Doublons']].map(([k, l]) => `<button class="chip ${f.own === k ? 'active' : ''}" data-own="${k}">${l}</button>`).join('')}</div>
     <div class="chips"><button class="chip ${f.rarity === 'all' ? 'active' : ''}" data-rarity="all">Toutes raretés</button>${S.cat.rarities.map((r) => `<button class="chip ${f.rarity === r.id ? 'active' : ''}" data-rarity="${r.id}"><i style="width:9px;height:9px;border-radius:50%;background:${r.color}"></i>${r.label}</button>`).join('')}</div>
-    <div class="chips"><button class="chip ${f.line === 'all' ? 'active' : ''}" data-line="all">Toutes lignes</button>${Object.keys(S.cat.lines).map((l) => `<button class="chip ${f.line === l ? 'active' : ''}" data-line="${l}" style="padding:4px 8px">${bullet(l)}</button>`).join('')}</div>
+    <div class="chips"><button class="chip ${f.net === 'all' ? 'active' : ''}" data-net="all">Tous réseaux</button>${S.cat.networks.map((n) => `<button class="chip ${f.net === n.id ? 'active' : ''}" data-net="${n.id}">${n.label}</button>`).join('')}</div>
+    <div class="chips"><button class="chip ${f.line === 'all' ? 'active' : ''}" data-line="all">Toutes lignes</button>${Object.keys(S.cat.lines).filter((l) => f.net === 'all' || S.cat.lines[l].network === f.net).map((l) => `<button class="chip ${f.line === l ? 'active' : ''}" data-line="${l}" style="padding:4px 8px">${bullet(l)}</button>`).join('')}</div>
   </div>
-  <div class="cards" id="grid">${list.length ? list.map((s) => cardHTML(s.id, { qty: owned()[s.id] || 0, locked: !owned()[s.id], attr: 'data-station' })).join('') : '<div class="empty" style="grid-column:1/-1">Aucune gare ne correspond.</div>'}</div>
-  <p class="hint" style="text-align:center;margin-top:14px">${list.length} gare${list.length > 1 ? 's' : ''} affichée${list.length > 1 ? 's' : ''}</p>`;
+  <div class="cards" id="grid">${list.length ? list.slice(0, f.limit).map((s) => cardHTML(s.id, { qty: owned()[s.id] || 0, locked: !owned()[s.id], attr: 'data-station' })).join('') : '<div class="empty" style="grid-column:1/-1">Aucune gare ne correspond.</div>'}</div>
+  ${list.length > f.limit ? `<div style="text-align:center;margin-top:16px"><button class="btn" data-more>Afficher plus (${list.length - f.limit} restantes)</button></div>` : `<p class="hint" style="text-align:center;margin-top:14px">${list.length} gare${list.length > 1 ? 's' : ''}</p>`}`;
 }
 
 function viewLines(v) {
-  const ids = Object.keys(S.cat.lines);
   v.innerHTML = `<div class="section-title" style="margin-top:4px"><h2>Avancement des lignes</h2></div>
+  ${S.cat.networks.map((n) => {
+    const ids = Object.keys(S.cat.lines).filter((l) => S.cat.lines[l].network === n.id);
+    const fin = ids.filter((l) => { const p = lineProgress(l); return p.have === p.total; }).length;
+    return `<div class="section-title" style="margin:18px 0 10px"><h2 style="font-size:17px">${n.label}</h2><span class="muted">${fin}/${ids.length} complètes</span></div>
   <div style="display:grid;gap:12px">${ids.map((l) => {
     const L = S.cat.lines[l], p = lineProgress(l), open = S.openLines.has(l), full = p.have === p.total;
     return `<div class="panel line-card ${open ? 'open' : ''}" style="--lc:${L.color}">
       <button class="line-head" data-line-toggle="${l}">${bullet(l, true)}
-        <div class="info"><b>Ligne ${l.replace('bis', ' bis')}${full ? '<span class="badge-done">COMPLÈTE ★</span>' : ''}</b>
+        <div class="info"><b>${L.network === 'metro' ? 'Ligne ' : L.network === 'rer' ? 'RER ' : L.network === 'tram' ? 'Tram ' : 'Transilien '}${l.replace('bis', ' bis')}${full ? '<span class="badge-done">COMPLÈTE ★</span>' : ''}</b>
         <div class="bar"><i style="width:${(p.have / p.total) * 100}%;background:${L.color}"></i></div></div>
         <span class="count">${p.have}/${p.total}</span><svg class="chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg></button>
       ${open ? `<div class="route">${L.routes.map((route, i) => `${L.routes.length > 1 ? `<h4>${i === 0 ? 'Tronc commun' : `Branche ${i}`}</h4>` : ''}${route.map((id) => {
@@ -191,6 +196,7 @@ function viewLines(v) {
       }).join('')}`).join('')}</div>` : ''}
     </div>`;
   }).join('')}</div>`;
+  }).join('')}`;
 }
 
 function viewAuctions(v) {
@@ -201,7 +207,7 @@ function viewAuctions(v) {
   if (S.aucTab === 'mine') list = list.filter((a) => a.seller.toLowerCase() === me || a.bid?.user.toLowerCase() === me);
   if (q) list = list.filter((a) => stationOf(a.stationId).name.toLowerCase().includes(q));
   list.sort((a, b) => a.endsAt - b.endsAt);
-  v.innerHTML = `<div class="section-title" style="margin-top:4px"><h2>Enchères</h2><button class="btn small primary" data-act="sellPick">+ Vendre une gare</button></div>
+  v.innerHTML = `<div class="section-title" style="margin-top:4px"><h2>Enchères</h2></div>
   <div class="tabs" style="max-width:360px"><button data-auc="all" class="${S.aucTab === 'all' ? 'active' : ''}">En cours (${S.market.auctions.length})</button><button data-auc="mine" class="${S.aucTab === 'mine' ? 'active' : ''}">Mes enchères</button></div>
   <div class="toolbar" style="margin:10px 0"><input id="aq" type="search" placeholder="Chercher une gare…" value="${esc(S.aucQ)}"></div>
   <div class="auclist">${list.length ? list.map((a) => {
@@ -215,7 +221,7 @@ function viewAuctions(v) {
         <div class="actions">${mine ? (a.bid ? '<span class="tag">Enchère en cours</span>' : `<button class="btn small danger" data-cancel="${a.id}">Annuler</button>`) : `<button class="btn small primary" data-bid="${a.id}">${leading ? 'Surenchérir' : 'Enchérir'}</button>`}</div>
       </div></div>`;
   }).join('') : `<div class="empty" style="grid-column:1/-1">${S.aucTab === 'mine' ? 'Tu ne participes à aucune enchère.' : 'Aucune enchère en cours. Lance la première !'}</div>`}</div>
-  <p class="hint" style="margin-top:14px">Une enchère dure 24 h. ${Math.round(S.market.feeRate * 100)} % de frais sont prélevés au vendeur sur chaque vente. Une surenchère doit dépasser l'actuelle d'au moins ${Math.round(S.market.minRaise * 100)} %.</p>`;
+  <p class="hint" style="margin-top:14px">Pour vendre une gare, ouvre-la depuis l'onglet Collection. Une enchère dure 24 h. ${Math.round(S.market.feeRate * 100)} % de frais sont prélevés au vendeur sur chaque vente. Une surenchère doit dépasser l'actuelle d'au moins ${Math.round(S.market.minRaise * 100)} %.</p>`;
 }
 
 function viewMe(v) {
@@ -223,7 +229,9 @@ function viewMe(v) {
   v.innerHTML = `<div class="section-title" style="margin-top:4px"><h2>${esc(u.name)}</h2><button class="btn small" data-act="logout">Se déconnecter</button></div>
   <div class="panel" style="display:flex;align-items:center;gap:14px"><span class="navigo" style="width:44px;height:44px;font-size:22px;border-radius:12px">N</span><div><div class="muted" style="font-size:13px">Solde</div><div style="font-size:28px;font-weight:800">${fmt(u.navigos)} Navigos</div></div></div>
   <div class="stats" style="margin-top:12px">
-    <div class="stat"><b>${st.opened}</b><span>Gares tirées</span></div><div class="stat"><b>${st.sold}</b><span>Ventes</span></div><div class="stat"><b>${st.scrapped}</b><span>Défoncées</span></div></div>
+    <div class="stat"><b>${st.opened}</b><span>Paquets ouverts</span></div><div class="stat"><b>${st.sold}</b><span>Ventes</span></div><div class="stat"><b>${st.scrapped}</b><span>Défoncées</span></div></div>
+  <div class="section-title"><h2>Succès</h2></div>
+  <div class="log">${S.cat.achievements.map((a) => { const got = u.ach && u.ach[a.id]; return `<div class="${got ? 'win' : ''}" style="opacity:${got ? 1 : .7}"><span style="flex:1"><b>${got ? '🏆' : '🔒'} ${esc(a.title)}</b><small>${esc(a.desc)}</small></span><span class="price">${got ? '✓' : `+${a.reward}`} <span class="navigo">N</span></span></div>`; }).join('')}</div>
   <div class="section-title"><h2>Journal</h2></div>${logHTML(u.log)}
   <p class="hint" style="margin-top:16px;text-align:center">Compte créé le ${new Date(u.created).toLocaleDateString('fr-FR')} · Ta progression est sauvegardée sur ton compte.</p>`;
   if (u.unread) api('/read', {}).then((r) => { setUser(r.user); const d = $('.nav .dot'); if (d) d.remove(); }).catch(() => {});
@@ -273,36 +281,31 @@ function bidModal(aid) {
     <button class="btn primary block" data-confirm-bid="${aid}">Confirmer</button>`);
 }
 
-async function pickToSell() {
-  const ids = Object.keys(owned());
-  if (!ids.length) return toast("Tu n'as aucune gare à vendre.", 'err');
-  const order = S.cat.rarities.map((r) => r.id);
-  ids.sort((a, b) => order.indexOf(stationOf(b).rarity) - order.indexOf(stationOf(a).rarity) || (owned()[b] - owned()[a]));
-  modal(`<h3 style="margin:6px 40px 12px 0">Quelle gare vendre ?</h3><p class="hint">Les doublons sont en premier dans chaque rareté.</p><div class="cards" style="grid-template-columns:repeat(2,1fr);max-height:60vh;overflow:auto;padding:4px">${ids.map((id) => cardHTML(id, { qty: owned()[id], attr: 'data-sell' })).join('')}</div>`);
-}
-
 async function openPack() {
   const btn = $('#openBtn'); if (btn) btn.disabled = true;
   const r = await act(() => api('/open', {}));
   if (!r) { if (btn) btn.disabled = false; return; }
   setUser(r.user);
-  const st = stationOf(r.stationId), rr = rar(st.rarity);
-  modal(`<div style="height:6px"></div><div class="flip" id="flip"><div class="flip-in"><div class="back"><i>M</i></div><div class="front">${cardHTML(r.stationId, { qty: r.qty, attr: 'data-none' })}</div></div></div>
+  const order = S.cat.rarities.map((x) => x.id);
+  const best = r.cards.reduce((m, c) => Math.max(m, order.indexOf(stationOf(c.stationId).rarity)), 0);
+  const nNew = r.cards.filter((c) => c.isNew).length;
+  modal(`<h3 style="margin:6px 40px 14px 0">Ton paquet</h3>
+    <div class="pack" id="pack">${r.cards.map((c, i) => `<div class="flip" style="--i:${i}"><div class="flip-in"><div class="back"><i>M</i></div>
+      <div class="front">${cardHTML(c.stationId, { qty: c.qty, attr: 'data-none' })}${c.isNew ? '<span class="newtag">NEW</span>' : ''}</div></div></div>`).join('')}</div>
     <div class="reveal-title" id="rt"></div><p class="hint" style="text-align:center;margin:4px 0 14px" id="rs"></p>
     <div class="actions-col"><button class="btn primary" data-close id="again" disabled>Super !</button></div>`);
+  const flips = [...document.querySelectorAll('#pack .flip')];
+  flips.forEach((f, i) => setTimeout(() => f.classList.add('on'), 500 + i * 450));
   setTimeout(() => {
-    $('#flip')?.classList.add('on');
-    setTimeout(() => {
-      const t = $('#rt'); if (!t) return;
-      t.style.color = rr.color;
-      t.textContent = r.isNew ? `Nouvelle gare ! ${rr.label}` : `Doublon ×${r.qty} · ${rr.label}`;
-      $('#rs').textContent = r.isNew ? 'Ajoutée à ta collection.' : `Tu peux la défoncer pour ${rr.scrap} Navigos ou la vendre aux enchères.`;
-      $('#again').disabled = false;
-      if (['super-rare', 'legendaire'].includes(st.rarity) && navigator.vibrate) navigator.vibrate([60, 40, 120]);
-    }, 700);
-  }, 450);
+    const t = $('#rt'); if (!t) return;
+    const rr = S.cat.rarities[best];
+    t.style.color = rr.color;
+    t.textContent = nNew ? `${nNew} nouvelle${nNew > 1 ? 's' : ''} gare${nNew > 1 ? 's' : ''} !` : 'Que des doublons…';
+    $('#rs').textContent = `Meilleure carte : ${rr.label}.` + (r.newAch ? ' 🏆 Nouveau succès débloqué !' : '');
+    $('#again').disabled = false;
+    if (best >= 3 && navigator.vibrate) navigator.vibrate([60, 40, 120]);
+  }, 500 + flips.length * 450 + 700);
   render();
-  // render() a remplacé #app seulement, la modale reste ouverte
 }
 
 // ---------- live timers ----------
@@ -321,10 +324,10 @@ function tick() {
   const ready = charges > 0;
   ring.classList.toggle('ready', ready);
   $('#ringT').textContent = ready ? `×${charges}` : left(nextAt - t);
-  $('#ringS').textContent = ready ? 'gare prête' : 'prochaine gare';
+  $('#ringS').textContent = ready ? (charges > 1 ? 'paquets prêts' : 'paquet prêt') : 'prochain paquet';
   ring.style.setProperty('--p', nextAt == null ? 100 : Math.min(100, (1 - (nextAt - t) / 3600000) * 100));
   const b = $('#openBtn'); if (b && !b.dataset.busy) b.disabled = !ready;
-  $('#stock').textContent = ready ? (charges > 1 ? `${charges} gares en stock (max ${u.max}).` : 'Ta gare de l\'heure est prête !') : `Stock : 0/${u.max} — une gare est débloquée chaque heure.`;
+  $('#stock').textContent = ready ? (charges > 1 ? `${charges} paquets en stock (max ${u.max}).` : 'Ton paquet de l\'heure est prêt !') : `Stock : 0/${u.max} — un paquet de 5 gares est débloqué chaque heure.`;
 }
 setInterval(tick, 1000);
 
@@ -357,14 +360,15 @@ document.addEventListener('click', async (e) => {
   if (d.tab) { S.tab = d.tab; try { localStorage.setItem('mm_tab', S.tab); } catch {} if (d.tab === 'auctions' || d.tab === 'cards') loadMarket().then(() => ['auctions'].includes(S.tab) && renderView()); render(); window.scrollTo(0, 0); return; }
   if (t.id === 'openBtn') return openPack();
   if (d.act === 'logout') return logout();
-  if (d.act === 'sellPick') return pickToSell();
   if (d.act === 'scrapDups') {
     if (!confirm('Défoncer tous tes doublons (en gardant 1 exemplaire de chaque gare) ?')) return;
     const r = await act(() => api('/scrap-duplicates', {})); if (r) { setUser(r.user); toast(`+${r.gain} Navigos (${r.count} cartes défoncées)`, 'ok'); render(); } return;
   }
-  if (d.own) { S.col.own = d.own; return renderView(); }
-  if (d.rarity) { S.col.rarity = d.rarity; return renderView(); }
-  if (d.line) { S.col.line = d.line; return renderView(); }
+  if (t.hasAttribute('data-more')) { S.col.limit += 60; return renderView(); }
+  if (d.own) { S.col.own = d.own; S.col.limit = 60; return renderView(); }
+  if (d.rarity) { S.col.rarity = d.rarity; S.col.limit = 60; return renderView(); }
+  if (d.net) { S.col.net = d.net; S.col.line = 'all'; S.col.limit = 60; return renderView(); }
+  if (d.line) { S.col.line = d.line; S.col.limit = 60; return renderView(); }
   if (d.lineToggle) { S.openLines.has(d.lineToggle) ? S.openLines.delete(d.lineToggle) : S.openLines.add(d.lineToggle); return renderView(); }
   if (d.auc) { S.aucTab = d.auc; return renderView(); }
   if (d.scrap) {
@@ -380,11 +384,11 @@ document.addEventListener('click', async (e) => {
   }
   if (d.bid) return bidModal(Number(d.bid));
   if (d.confirmBid) {
-    const r = await act(() => api(`/auctions/${d.confirmBid}/bid`, { amount: $('#ba').value }));
+    const r = await act(() => api('/bid', { auctionId: Number(d.confirmBid), amount: $('#ba').value }));
     if (r) { setUser(r.user); closeModal(); toast('Enchère placée !', 'ok'); await loadMarket(); render(); } return;
   }
   if (d.cancel) {
-    const r = await act(() => api(`/auctions/${d.cancel}/cancel`, {}));
+    const r = await act(() => api('/cancel', { auctionId: Number(d.cancel) }));
     if (r) { setUser(r.user); toast('Enchère annulée, la gare est revenue.', 'ok'); await loadMarket(); render(); } return;
   }
   if (d.gotoAuc !== undefined) { closeModal(); S.tab = 'auctions'; await loadMarket(); return render(); }
@@ -392,7 +396,7 @@ document.addEventListener('click', async (e) => {
 });
 
 document.addEventListener('input', (e) => {
-  if (e.target.id === 'q') { S.col.q = e.target.value; const pos = e.target.selectionStart; renderView(); const q = $('#q'); q.focus(); q.setSelectionRange(pos, pos); }
+  if (e.target.id === 'q') { S.col.q = e.target.value; S.col.limit = 60; const pos = e.target.selectionStart; renderView(); const q = $('#q'); q.focus(); q.setSelectionRange(pos, pos); }
   if (e.target.id === 'aq') { S.aucQ = e.target.value; const pos = e.target.selectionStart; renderView(); const q = $('#aq'); q.focus(); q.setSelectionRange(pos, pos); }
 });
 document.addEventListener('change', (e) => { if (e.target.id === 'sort') { S.col.sort = e.target.value; renderView(); } });

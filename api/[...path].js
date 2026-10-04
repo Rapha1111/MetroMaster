@@ -59,10 +59,8 @@ module.exports = async function handler(req, res) {
       case 'POST /read': return send(res, 200, { user: await game.markRead(name) });
       case 'GET /market': return send(res, 200, await game.market());
       case 'POST /auctions': return send(res, 200, await game.createAuction(name, body.id, body.minPrice));
-    }
-    const m = /^auctions\/(\d+)\/(bid|cancel)$/.exec(parts.join('/'));
-    if (m && req.method === 'POST') {
-      return send(res, 200, m[2] === 'bid' ? await game.bid(name, m[1], body.amount) : await game.cancelAuction(name, m[1]));
+      case 'POST /bid': return send(res, 200, await game.bid(name, body.auctionId, body.amount));
+      case 'POST /cancel': return send(res, 200, await game.cancelAuction(name, body.auctionId));
     }
     return send(res, 404, { error: 'Route inconnue.' });
   } catch (e) {
