@@ -118,3 +118,14 @@ test('enchères : durée au choix, 5 max, sans frais', async () => {
   advance(11 * 60 * 1000);
   assert.equal((await game.me('dave')).navigos, 20);
 });
+
+test('achat de paquet : 50 Navigos, ne touche pas au stock horaire', async () => {
+  const { game, store } = setup();
+  await game.register('buyer', 'secret1');
+  await assert.rejects(game.buyPack('buyer'), /50 Navigos/);
+  const u = await store.get('user:buyer'); u.navigos = 70; await store.set('user:buyer', u);
+  const r = await game.buyPack('buyer');
+  assert.equal(r.cards.length, 5);
+  assert.equal(r.user.navigos, 20);
+  assert.equal(r.user.charges, 2);
+});

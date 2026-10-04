@@ -120,6 +120,7 @@ function viewHome(v) {
     <div class="ring" id="ring"><div><div class="t" id="ringT">…</div><div class="s" id="ringS"></div></div></div>
     <button class="btn primary" id="openBtn" style="min-width:230px;font-size:18px;padding:15px 22px">Ouvrir un paquet</button>
     <p class="hint" style="margin:12px 0 0" id="stock"></p>
+    <button class="btn" data-act="buyPack" style="margin-top:10px" ${u.navigos < 50 ? 'disabled' : ''}>Acheter un paquet · <span class="navigo" style="vertical-align:-5px">N</span> 50</button>
   </section>
   <div class="section-title"><h2>Ta progression</h2></div>
   <div class="stats">
@@ -305,9 +306,9 @@ function bidModal(aid) {
     <button class="btn primary block" data-confirm-bid="${aid}">Confirmer</button>`);
 }
 
-async function openPack() {
+async function openPack(path = '/open') {
   const btn = $('#openBtn'); if (btn) btn.disabled = true;
-  const r = await act(() => api('/open', {}));
+  const r = await act(() => api(path, {}));
   if (!r) { if (btn) btn.disabled = false; return; }
   setUser(r.user);
   const order = S.cat.rarities.map((x) => x.id);
@@ -385,6 +386,7 @@ document.addEventListener('click', async (e) => {
   if (d.tab) { S.tab = d.tab; try { localStorage.setItem('mm_tab', S.tab); } catch {} if (d.tab === 'auctions' || d.tab === 'cards') loadMarket().then(() => ['auctions'].includes(S.tab) && renderView()); render(); window.scrollTo(0, 0); return; }
   if (t.id === 'openBtn') return openPack();
   if (d.act === 'logout') return logout();
+  if (d.act === 'buyPack') return openPack('/buy-pack');
   if (d.act === 'scrapDups') {
     if (!confirm('Défausser tous tes doublons (en gardant 1 exemplaire de chaque gare) ?')) return;
     const r = await act(() => api('/scrap-duplicates', {})); if (r) { setUser(r.user); toast(`+${r.gain} Navigos (${r.count} cartes défaussées)`, 'ok'); render(); } return;
