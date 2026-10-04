@@ -110,7 +110,7 @@ function renderAuth() {
       <label for="p">Mot de passe</label><input id="p" type="password" autocomplete="${reg ? 'new-password' : 'current-password'}" required minlength="6">
       <div class="err" id="authErr"></div>
       <button class="btn primary block" id="authBtn">${reg ? '🚇 Commencer l\'aventure' : 'Se connecter'}</button>
-      ${reg ? '<p class="hint" style="text-align:center">5 gares + 100 Navigos offerts à l\'inscription.</p>' : ''}
+      ${reg ? '<p class="hint" style="text-align:center">2 paquets de 5 gares offerts à l\'inscription.</p>' : ''}
     </form></div></div>`;
 }
 
@@ -122,7 +122,9 @@ function viewHome(v) {
     <div class="ring" id="ring"><div><div class="t" id="ringT">…</div><div class="s" id="ringS"></div></div></div>
     <button class="btn primary" id="openBtn" style="min-width:230px;font-size:18px;padding:15px 22px">Ouvrir un paquet</button>
     <p class="hint" style="margin:12px 0 0" id="stock"></p>
-    <button class="btn" data-act="buyPack" style="margin-top:10px" ${u.navigos < 50 ? 'disabled' : ''}>Acheter un paquet · <span class="navigo" style="vertical-align:-5px">N</span> 50</button>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px">
+      <button class="btn" data-act="buyPack" ${u.navigos < 50 ? 'disabled' : ''}>Acheter un paquet · <span class="navigo" style="vertical-align:-5px">N</span> 50</button>
+      <button class="btn" data-act="buyPack10" ${u.navigos < 500 ? 'disabled' : ''}>Ouvrir 10 paquets · <span class="navigo" style="vertical-align:-5px">N</span> 500</button></div>
   </section>
   <div class="section-title"><h2>Ta progression</h2></div>
   <div class="stats">
@@ -313,21 +315,25 @@ function bidModal(aid) {
     <button class="btn primary block" data-confirm-bid="${aid}">Confirmer</button>`);
 }
 
-async function openPack(path = '/open') {
+async function openPack(path = '/open', body = {}) {
   const btn = $('#openBtn'); if (btn) btn.disabled = true;
-  const r = await act(() => api(path, {}));
+  const r = await act(() => api(path, body));
   if (!r) { if (btn) btn.disabled = false; return; }
   setUser(r.user);
   const order = S.cat.rarities.map((x) => x.id);
+  const multi = r.cards.length > 5;
+  if (multi) r.cards.sort((a, b) => order.indexOf(stationOf(b.stationId).rarity) - order.indexOf(stationOf(a.stationId).rarity));
   const best = r.cards.reduce((m, c) => Math.max(m, order.indexOf(stationOf(c.stationId).rarity)), 0);
   const nNew = r.cards.filter((c) => c.isNew).length;
-  modal(`<h3 style="margin:6px 40px 14px 0">Ton paquet</h3>
+  modal(`<h3 style="margin:6px 40px 14px 0">${multi ? `Tes ${r.cards.length / 5} paquets` : 'Ton paquet'}</h3>
+    ${multi ? `<p class="hint" style="margin:-6px 0 12px">${S.cat.rarities.slice().reverse().map((x) => { const n = r.cards.filter((c) => stationOf(c.stationId).rarity === x.id).length; return n ? `<b style="color:${x.color}">${n} ${x.label.toLowerCase()}${n > 1 ? 's' : ''}</b>` : ''; }).filter(Boolean).join(' · ')}</p>` : ''}
     <div class="pack" id="pack">${r.cards.map((c, i) => `<div class="flip" style="--i:${i}"><div class="flip-in"><div class="back"><i>M</i></div>
       <div class="front">${cardHTML(c.stationId, { qty: c.qty, attr: 'data-none' })}${c.isNew ? '<span class="newtag">NEW</span>' : ''}</div></div></div>`).join('')}</div>
     <div class="reveal-title" id="rt"></div><p class="hint" style="text-align:center;margin:4px 0 14px" id="rs"></p>
     <div class="actions-col"><button class="btn primary" data-close id="again" disabled>Super !</button></div>`);
   const flips = [...document.querySelectorAll('#pack .flip')];
-  flips.forEach((f, i) => setTimeout(() => f.classList.add('on'), 500 + i * 450));
+  const step = multi ? 25 : 450;
+  flips.forEach((f, i) => setTimeout(() => f.classList.add('on'), 500 + i * step));
   setTimeout(() => {
     const t = $('#rt'); if (!t) return;
     const rr = S.cat.rarities[best];
@@ -336,7 +342,7 @@ async function openPack(path = '/open') {
     $('#rs').textContent = `Meilleure carte : ${rr.label}.` + (r.newAch ? ' 🏆 Nouveau succès débloqué !' : '');
     $('#again').disabled = false;
     if (best >= 3 && navigator.vibrate) navigator.vibrate([60, 40, 120]);
-  }, 500 + flips.length * 450 + 700);
+  }, 500 + flips.length * step + 700);
   render();
 }
 
@@ -422,7 +428,8 @@ document.addEventListener('click', async (e) => {
     if (r) { setUser(r.user); S.sel.items = {}; toast(`+${r.gain} Navigos (${r.count} cartes défaussées)`, 'ok'); render(); } return;
   }
   if (d.act === 'logout') return logout();
-  if (d.act === 'buyPack') return openPack('/buy-pack');
+  if (d.act === 'buyPack') return openPack('/buy-pack', { count: 1 });
+  if (d.act === 'buyPack10') return openPack('/buy-pack', { count: 10 });
   if (d.act === 'scrapDups') {
     if (!confirm('Défausser tous tes doublons (en gardant 1 exemplaire de chaque gare) ?')) return;
     const r = await act(() => api('/scrap-duplicates', {})); if (r) { setUser(r.user); toast(`+${r.gain} Navigos (${r.count} cartes défaussées)`, 'ok'); render(); } return;

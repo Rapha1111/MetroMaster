@@ -159,3 +159,15 @@ test('code GRANDPARIS : 5000 Navigos', async () => {
   await game.register('grand', 'secret1');
   assert.equal((await game.redeem('grand', 'grandparis')).user.navigos, 5000);
 });
+
+test('ouvrir 10 paquets pour 500 Navigos', async () => {
+  const { game, store } = setup();
+  await game.register('tenpack', 'secret1');
+  const u = await store.get('user:tenpack'); u.navigos = 520; await store.set('user:tenpack', u);
+  await assert.rejects(game.buyPack('tenpack', 3), /invalide/);
+  const r = await game.buyPack('tenpack', 10);
+  assert.equal(r.cards.length, 50);
+  assert.equal(r.user.navigos, 20);
+  assert.equal(Object.values(r.user.cards).reduce((a, b) => a + b, 0), 50);
+  await assert.rejects(game.buyPack('tenpack', 10), /500 Navigos/);
+});
