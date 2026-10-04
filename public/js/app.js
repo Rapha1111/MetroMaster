@@ -83,6 +83,7 @@ function render() {
   if (!S.user) return renderAuth();
   const u = S.user;
   $('#app').innerHTML = `<div class="shell">
+    ${S.volatile ? '<div class="warn-banner">⚠️ Base de données non configurée sur le serveur : ta progression sera perdue à la prochaine mise à jour. Connecte Upstash Redis dans Vercel (voir README).</div>' : ''}
     <header class="topbar"><div class="logo"><i>M</i>MetroMaster</div><div class="spacer"></div>
       <div class="wallet" title="Tes Navigos"><span class="navigo">N</span><span id="wallet">${fmt(u.navigos)}</span></div></header>
     <main class="main" id="view"></main>
@@ -232,14 +233,27 @@ function viewAuctions(v) {
   <p class="hint" style="margin-top:14px">Aucun frais. Tu peux avoir ${S.market.maxActive} enchères en cours au maximum. Une surenchère doit dépasser l'actuelle d'au moins ${Math.round(S.market.minRaise * 100)} %.</p>`;
 }
 
+function achProgress(a) {
+  const ps = a.lines.map((l) => ({ l, ...lineProgress(l) }));
+  if (a.mode === 'all') return { have: ps.filter((p) => p.have === p.total).length, total: ps.length, unit: 'lignes' };
+  const best = ps.reduce((m, p) => (p.have / p.total > m.have / m.total ? p : m), ps[0]);
+  return { have: best.have, total: best.total, unit: `gares · ligne ${best.l.replace('bis', ' bis')}` };
+}
+function achHTML(a) {
+  const got = S.user.ach && S.user.ach[a.id], p = achProgress(a);
+  return `<div class="${got ? 'win' : ''}" style="flex-wrap:wrap"><span style="flex:1;min-width:0"><b>${got ? '🏆' : '🔒'} ${esc(a.title)}</b><small>${esc(a.desc)}</small></span>
+    <span class="price">${got ? '✓' : `+${a.reward}`} <span class="navigo">N</span></span>
+    ${got ? '' : `<span style="flex-basis:100%"><span class="bar"><i style="width:${(p.have / p.total) * 100}%"></i></span><small>${p.have}/${p.total} ${p.unit}</small></span>`}</div>`;
+}
+
 function viewMe(v) {
   const u = S.user, st = u.stats;
   v.innerHTML = `<div class="section-title" style="margin-top:4px"><h2>${esc(u.name)}</h2><button class="btn small" data-act="logout">Se déconnecter</button></div>
   <div class="panel" style="display:flex;align-items:center;gap:14px"><span class="navigo" style="width:44px;height:44px;font-size:22px;border-radius:12px">N</span><div><div class="muted" style="font-size:13px">Solde</div><div style="font-size:28px;font-weight:800">${fmt(u.navigos)} Navigos</div></div></div>
   <div class="stats" style="margin-top:12px">
     <div class="stat"><b>${st.opened}</b><span>Paquets ouverts</span></div><div class="stat"><b>${st.sold}</b><span>Ventes</span></div><div class="stat"><b>${st.scrapped}</b><span>Défoncées</span></div></div>
-  <div class="section-title"><h2>Succès</h2></div>
-  ${S.cat.networks.map((n) => `<h3 style="font-size:15px;margin:14px 0 8px;color:var(--muted)">${n.label}</h3><div class="log">${S.cat.achievements.filter((a) => a.network === n.id).map((a) => { const got = u.ach && u.ach[a.id]; return `<div class="${got ? 'win' : ''}" style="opacity:${got ? 1 : .7}"><span style="flex:1"><b>${got ? '🏆' : '🔒'} ${esc(a.title)}</b><small>${esc(a.desc)}</small></span><span class="price">${got ? '✓' : `+${a.reward}`} <span class="navigo">N</span></span></div>`; }).join('')}</div>`).join('')}
+  <div class="section-title"><h2>Succès</h2><span class="muted">${Object.keys(u.ach || {}).filter((k) => S.cat.achievements.some((a) => a.id === k)).length}/${S.cat.achievements.length} débloqués</span></div>
+  ${S.cat.networks.map((n) => `<h3 style="font-size:15px;margin:14px 0 8px;color:var(--muted)">${n.label}</h3><div class="log">${S.cat.achievements.filter((a) => a.network === n.id).map(achHTML).join('')}</div>`).join('')}
   <div class="section-title"><h2>Journal</h2></div>${logHTML(u.log)}
   <p class="hint" style="margin-top:16px;text-align:center">Compte créé le ${new Date(u.created).toLocaleDateString('fr-FR')} · Ta progression est sauvegardée sur ton compte.</p>`;
   if (u.unread) api('/read', {}).then((r) => { setUser(r.user); const d = $('.nav .dot'); if (d) d.remove(); }).catch(() => {});
@@ -354,7 +368,8 @@ function logout(silent) {
 
 async function boot() {
   try {
-    S.cat = await (await fetch('/api/catalog')).json();
+    S.cat = await (await fetch('/api/catalog', { cache: 'no-cache' })).json();
+    fetch('/api/health').then((r) => r.json()).then((h) => { S.volatile = h.persistent === false; if (S.volatile) render(); }).catch(() => {});
     for (const r of S.cat.rarities) RAR[r.id] = r;
     for (const s of S.cat.stations) ST[s.id] = s;
   } catch { $('#app').innerHTML = '<div class="empty">Impossible de charger le jeu. Recharge la page.</div>'; return; }

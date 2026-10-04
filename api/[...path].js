@@ -36,7 +36,7 @@ module.exports = async function handler(req, res) {
     const body = req.method === 'POST' ? await readBody(req) : {};
 
     if (route === 'GET /health') return send(res, 200, { ok: true, persistent: store.persistent });
-    if (route === 'GET /catalog') { res.setHeader('Cache-Control', 'public, max-age=3600'); res.statusCode = 200; res.setHeader('Content-Type', 'application/json'); return res.end(JSON.stringify(catalog())); }
+    if (route === 'GET /catalog') { res.setHeader('Cache-Control', 'no-cache'); res.statusCode = 200; res.setHeader('Content-Type', 'application/json'); return res.end(JSON.stringify(catalog())); }
 
     if (route === 'POST /register') {
       const { user } = await game.register(body.username, body.password);

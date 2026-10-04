@@ -19,7 +19,7 @@ npm test
 2. Variables d'environnement :
    - `AUTH_SECRET` : longue chaîne aléatoire (signature des sessions) — **obligatoire**.
    - Base de données : ajouter l'intégration **Upstash Redis** (Marketplace) ; elle fournit `KV_REST_API_URL` / `KV_REST_API_TOKEN` (ou `UPSTASH_REDIS_REST_URL` / `_TOKEN`).
-   Sans Redis, les données sont en mémoire et perdues régulièrement (`/api/health` renvoie `persistent:false`).
+   **Sans Redis, toute la progression est perdue à chaque déploiement** (l'app affiche alors un bandeau d'avertissement) (`/api/health` renvoie `persistent:false`).
 
 ## Structure
 `api/[...path].js` (API) · `lib/` (données métro, logique de jeu, stockage, auth) · `public/` (front PWA) · `test/`

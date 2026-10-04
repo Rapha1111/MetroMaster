@@ -255,3 +255,5 @@ label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 6px
 .newtag { position: absolute; top: -6px; right: -6px; background: var(--danger); color: #fff; font-size: 10px; font-weight: 900; padding: 2px 6px; border-radius: 8px; z-index: 3; }
 .flip-in .front { position: absolute; }
 @media (min-width: 520px) { .modal:has(.pack) { max-width: 560px; } .pack { grid-template-columns: repeat(5, 1fr); } }
+.warn-banner { background: #5a3a00; color: #ffe2a8; padding: 8px 14px; font-size: 13px; font-weight: 600; text-align: center; padding-top: calc(8px + var(--safe-t)); }
+.log .bar { display: block; margin: 8px 0 4px; }
