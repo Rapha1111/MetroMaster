@@ -153,3 +153,9 @@ test('favoris et défausse multiple', async () => {
   assert.equal((await game.me('multi')).favs.vavin, undefined);
   await assert.rejects(game.toggleFav('multi', 'nation'), /ne possèdes pas/);
 });
+
+test('code GRANDPARIS : 5000 Navigos', async () => {
+  const { game } = setup();
+  await game.register('grand', 'secret1');
+  assert.equal((await game.redeem('grand', 'grandparis')).user.navigos, 5000);
+});
