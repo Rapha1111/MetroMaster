@@ -1,0 +1,12 @@
+{
+  "name": "metromaster",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MetroMaster – collectionne les stations du métro parisien",
+  "scripts": {
+    "dev": "node dev-server.js",
+    "start": "node dev-server.js",
+    "test": "node --test test/game.test.js"
+  },
+  "engines": { "node": ">=20" }
+}
