@@ -129,3 +129,12 @@ test('achat de paquet : 50 Navigos, ne touche pas au stock horaire', async () =>
   assert.equal(r.user.navigos, 20);
   assert.equal(r.user.charges, 2);
 });
+
+test('code secret : 500 Navigos, une seule fois par compte', async () => {
+  const { game } = setup();
+  await game.register('coder', 'secret1');
+  await assert.rejects(game.redeem('coder', 'NOPE'), /invalide/);
+  const r = await game.redeem('coder', ' iloveparis ');
+  assert.equal(r.user.navigos, 500);
+  await assert.rejects(game.redeem('coder', 'ILOVEPARIS'), /déjà/);
+});

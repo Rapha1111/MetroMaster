@@ -54,6 +54,7 @@ module.exports = async function handler(req, res) {
     switch (route) {
       case 'GET /me': return send(res, 200, { user: await game.me(name) });
       case 'POST /open': return send(res, 200, await game.open(name));
+      case 'POST /redeem': return send(res, 200, await game.redeem(name, body.code));
       case 'POST /buy-pack': return send(res, 200, await game.buyPack(name));
       case 'POST /scrap': return send(res, 200, await game.scrap(name, body.id, body.qty));
       case 'POST /scrap-duplicates': return send(res, 200, await game.scrapDuplicates(name));

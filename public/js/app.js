@@ -256,7 +256,7 @@ function viewMe(v) {
   <div class="section-title"><h2>Succès</h2><span class="muted">${Object.keys(u.ach || {}).filter((k) => S.cat.achievements.some((a) => a.id === k)).length}/${S.cat.achievements.length} débloqués</span></div>
   ${S.cat.networks.map((n) => `<h3 style="font-size:15px;margin:14px 0 8px;color:var(--muted)">${n.label}</h3><div class="log">${S.cat.achievements.filter((a) => a.network === n.id).map(achHTML).join('')}</div>`).join('')}
   <div class="section-title"><h2>Journal</h2></div>${logHTML(u.log)}
-  <p class="hint" style="margin-top:16px;text-align:center">Compte créé le ${new Date(u.created).toLocaleDateString('fr-FR')} · Ta progression est sauvegardée sur ton compte.</p>`;
+  <p class="hint" data-secret style="margin-top:16px;text-align:center">Compte créé le ${new Date(u.created).toLocaleDateString('fr-FR')} · Ta progression est sauvegardée sur ton compte.</p>`;
   if (u.unread) api('/read', {}).then((r) => { setUser(r.user); const d = $('.nav .dot'); if (d) d.remove(); }).catch(() => {});
 }
 
@@ -380,11 +380,20 @@ async function boot() {
 
 // ---------- events ----------
 document.addEventListener('click', async (e) => {
-  const t = e.target.closest('button, [data-station], [data-sell]'); if (!t) return;
+  const t = e.target.closest('button, [data-station], [data-sell], [data-secret]'); if (!t) return;
   const d = t.dataset;
   if (d.auth) { S.auth = d.auth; return renderAuth(); }
   if (d.tab) { S.tab = d.tab; try { localStorage.setItem('mm_tab', S.tab); } catch {} if (d.tab === 'auctions' || d.tab === 'cards') loadMarket().then(() => ['auctions'].includes(S.tab) && renderView()); render(); window.scrollTo(0, 0); return; }
   if (t.id === 'openBtn') return openPack();
+  if (t.hasAttribute('data-secret') || e.target.closest('[data-secret]')) {
+    S.secretTaps = (S.secretTaps || 0) + 1; clearTimeout(S.secretT); S.secretT = setTimeout(() => { S.secretTaps = 0; }, 1500);
+    if (S.secretTaps >= 3) { S.secretTaps = 0; modal(`<h3 style="margin:6px 40px 12px 0">🤫 Code secret</h3><label for="code">Entre ton code</label><input id="code" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false"><div style="height:12px"></div><button class="btn primary block" data-redeem>Valider</button>`); }
+    return;
+  }
+  if (d.redeem !== undefined) {
+    const r = await act(() => api('/redeem', { code: $('#code').value }));
+    if (r) { setUser(r.user); closeModal(); toast(`+${r.reward} Navigos !`, 'ok'); render(); } return;
+  }
   if (d.act === 'logout') return logout();
   if (d.act === 'buyPack') return openPack('/buy-pack');
   if (d.act === 'scrapDups') {
