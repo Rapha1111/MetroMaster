@@ -37,7 +37,7 @@ test('une gare par heure', async () => {
   assert.equal((await game.me('alice')).charges, 5);
 });
 
-test('défonce contre des Navigos', async () => {
+test('défausse contre des Navigos', async () => {
   const { game } = setup();
   await game.register('bob', 'secret1');
   await game.open('bob');

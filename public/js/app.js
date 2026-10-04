@@ -166,7 +166,7 @@ function viewCards(v) {
   const dups = Object.values(owned()).reduce((a, q) => a + Math.max(0, q - 1), 0);
   v.innerHTML = `
   <div class="section-title" style="margin-top:4px"><h2>Collection <span class="muted" style="font-size:15px">${uniqueOwned()}/${Object.keys(ST).length}</span></h2>
-    ${dups ? `<button class="btn small danger" data-act="scrapDups">Défoncer ${dups} doublon${dups > 1 ? 's' : ''}</button>` : ''}</div>
+    ${dups ? `<button class="btn small danger" data-act="scrapDups">Défausser ${dups} doublon${dups > 1 ? 's' : ''}</button>` : ''}</div>
   <div class="toolbar">
     <div class="row"><input id="q" type="search" placeholder="Chercher une gare…" value="${esc(f.q)}">
       <select id="sort" style="width:auto"><option value="rarity" ${f.sort === 'rarity' ? 'selected' : ''}>Rareté</option><option value="name" ${f.sort === 'name' ? 'selected' : ''}>A → Z</option><option value="qty" ${f.sort === 'qty' ? 'selected' : ''}>Quantité</option></select></div>
@@ -251,7 +251,7 @@ function viewMe(v) {
   v.innerHTML = `<div class="section-title" style="margin-top:4px"><h2>${esc(u.name)}</h2><button class="btn small" data-act="logout">Se déconnecter</button></div>
   <div class="panel" style="display:flex;align-items:center;gap:14px"><span class="navigo" style="width:44px;height:44px;font-size:22px;border-radius:12px">N</span><div><div class="muted" style="font-size:13px">Solde</div><div style="font-size:28px;font-weight:800">${fmt(u.navigos)} Navigos</div></div></div>
   <div class="stats" style="margin-top:12px">
-    <div class="stat"><b>${st.opened}</b><span>Paquets ouverts</span></div><div class="stat"><b>${st.sold}</b><span>Ventes</span></div><div class="stat"><b>${st.scrapped}</b><span>Défoncées</span></div></div>
+    <div class="stat"><b>${st.opened}</b><span>Paquets ouverts</span></div><div class="stat"><b>${st.sold}</b><span>Ventes</span></div><div class="stat"><b>${st.scrapped}</b><span>Défaussées</span></div></div>
   <div class="section-title"><h2>Succès</h2><span class="muted">${Object.keys(u.ach || {}).filter((k) => S.cat.achievements.some((a) => a.id === k)).length}/${S.cat.achievements.length} débloqués</span></div>
   ${S.cat.networks.map((n) => `<h3 style="font-size:15px;margin:14px 0 8px;color:var(--muted)">${n.label}</h3><div class="log">${S.cat.achievements.filter((a) => a.network === n.id).map(achHTML).join('')}</div>`).join('')}
   <div class="section-title"><h2>Journal</h2></div>${logHTML(u.log)}
@@ -275,11 +275,11 @@ function detail(id) {
       <div class="stat"><b style="color:${r.color}">${r.label}</b><span>${st.lines.length} ligne${st.lines.length > 1 ? 's' : ''}</span></div>
       <div class="stat"><b>${q}</b><span>Exemplaire${q > 1 ? 's' : ''}</span></div>
       <div class="stat"><b>${pr ? fmt(pr.avg) : '—'}</b><span>Prix moyen enchères${pr ? ` (${pr.count})` : ''}</span></div>
-      <div class="stat"><b>${r.scrap}</b><span>Navigos si défoncée</span></div></div>
+      <div class="stat"><b>${r.scrap}</b><span>Navigos si défaussée</span></div></div>
     ${q ? `<div class="actions-col">
       <button class="btn primary" data-sell="${id}">Mettre aux enchères</button>
-      <button class="btn danger" data-scrap="${id}" data-n="1">Défoncer 1 exemplaire (+${r.scrap} N)</button>
-      ${q > 1 ? `<button class="btn danger" data-scrap="${id}" data-n="${q - 1}">Défoncer les ${q - 1} doublons (+${r.scrap * (q - 1)} N)</button>` : ''}</div>`
+      <button class="btn danger" data-scrap="${id}" data-n="1">Défausser 1 exemplaire (+${r.scrap} N)</button>
+      ${q > 1 ? `<button class="btn danger" data-scrap="${id}" data-n="${q - 1}">Défausser les ${q - 1} doublons (+${r.scrap * (q - 1)} N)</button>` : ''}</div>`
       : '<p class="hint" style="text-align:center">Tu ne possèdes pas encore cette gare. Tente ta chance au tirage ou aux enchères !</p><div class="actions-col"><button class="btn" data-goto-auc>Voir les enchères</button></div>'}`);
 }
 
@@ -386,8 +386,8 @@ document.addEventListener('click', async (e) => {
   if (t.id === 'openBtn') return openPack();
   if (d.act === 'logout') return logout();
   if (d.act === 'scrapDups') {
-    if (!confirm('Défoncer tous tes doublons (en gardant 1 exemplaire de chaque gare) ?')) return;
-    const r = await act(() => api('/scrap-duplicates', {})); if (r) { setUser(r.user); toast(`+${r.gain} Navigos (${r.count} cartes défoncées)`, 'ok'); render(); } return;
+    if (!confirm('Défausser tous tes doublons (en gardant 1 exemplaire de chaque gare) ?')) return;
+    const r = await act(() => api('/scrap-duplicates', {})); if (r) { setUser(r.user); toast(`+${r.gain} Navigos (${r.count} cartes défaussées)`, 'ok'); render(); } return;
   }
   if (t.hasAttribute('data-more')) { S.col.limit += 60; return renderView(); }
   if (d.own) { S.col.own = d.own; S.col.limit = 60; return renderView(); }

@@ -5,7 +5,7 @@ Jeu de cartes à collectionner : les cartes sont les ~320 stations du métro par
 - **1 paquet de 5 gares par heure** (5 paquets de 5 gares en stock maximum).
 - **Raretés** selon le nombre de lignes : 1 = commune, 2 = peu commune, 3 = rare, 4 = super rare, 5 = légendaire (Châtelet, République).
 - **Lignes** : avancement de chaque ligne en fonction des gares possédées.
-- **Navigos** (monnaie) : 0 au départ (à gagner en défonçant des gares et via les succès) ; « défoncer » une gare contre des Navigos ; **enchères de 10 min à 24 h** (5 max par joueur, sans frais) avec prix minimum, surenchère ≥ 5 %, **prix moyen de vente** par gare.
+- **Navigos** (monnaie) : 0 au départ (à gagner en défaussant des gares et via les succès) ; « défausser » une gare contre des Navigos ; **enchères de 10 min à 24 h** (5 max par joueur, sans frais) avec prix minimum, surenchère ≥ 5 %, **prix moyen de vente** par gare.
 - Comptes (pseudo + mot de passe) pour sauvegarder la progression ; PWA installable (iPhone, Android, PC).
 
 ## Lancer en local
