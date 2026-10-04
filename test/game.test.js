@@ -90,7 +90,7 @@ test('succès : finir une ligne rapporte des Navigos', async () => {
   await store.set('user:lineman', u);
   const r = await game.open('lineman');
   assert.equal(r.newAch, 1);
-  assert.ok(r.user.ach.line);
+  assert.ok(r.user.ach['line-metro']);
 });
 
 test('enchère sans enchérisseur : la carte revient', async () => {

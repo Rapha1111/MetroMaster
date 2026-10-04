@@ -239,7 +239,7 @@ function viewMe(v) {
   <div class="stats" style="margin-top:12px">
     <div class="stat"><b>${st.opened}</b><span>Paquets ouverts</span></div><div class="stat"><b>${st.sold}</b><span>Ventes</span></div><div class="stat"><b>${st.scrapped}</b><span>Défoncées</span></div></div>
   <div class="section-title"><h2>Succès</h2></div>
-  <div class="log">${S.cat.achievements.map((a) => { const got = u.ach && u.ach[a.id]; return `<div class="${got ? 'win' : ''}" style="opacity:${got ? 1 : .7}"><span style="flex:1"><b>${got ? '🏆' : '🔒'} ${esc(a.title)}</b><small>${esc(a.desc)}</small></span><span class="price">${got ? '✓' : `+${a.reward}`} <span class="navigo">N</span></span></div>`; }).join('')}</div>
+  ${S.cat.networks.map((n) => `<h3 style="font-size:15px;margin:14px 0 8px;color:var(--muted)">${n.label}</h3><div class="log">${S.cat.achievements.filter((a) => a.network === n.id).map((a) => { const got = u.ach && u.ach[a.id]; return `<div class="${got ? 'win' : ''}" style="opacity:${got ? 1 : .7}"><span style="flex:1"><b>${got ? '🏆' : '🔒'} ${esc(a.title)}</b><small>${esc(a.desc)}</small></span><span class="price">${got ? '✓' : `+${a.reward}`} <span class="navigo">N</span></span></div>`; }).join('')}</div>`).join('')}
   <div class="section-title"><h2>Journal</h2></div>${logHTML(u.log)}
   <p class="hint" style="margin-top:16px;text-align:center">Compte créé le ${new Date(u.created).toLocaleDateString('fr-FR')} · Ta progression est sauvegardée sur ton compte.</p>`;
   if (u.unread) api('/read', {}).then((r) => { setUser(r.user); const d = $('.nav .dot'); if (d) d.remove(); }).catch(() => {});
