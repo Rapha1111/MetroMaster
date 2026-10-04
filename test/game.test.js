@@ -31,10 +31,10 @@ test('une gare par heure', async () => {
   await assert.rejects(game.open('alice'), /Pas encore/);
   advance(1);
   await game.open('alice');
-  advance(5 * H);
-  assert.equal((await game.me('alice')).charges, 5);
+  advance(3 * H);
+  assert.equal((await game.me('alice')).charges, 3);
   advance(100 * H);
-  assert.equal((await game.me('alice')).charges, 24);
+  assert.equal((await game.me('alice')).charges, 5);
 });
 
 test('défonce contre des Navigos', async () => {
@@ -68,7 +68,7 @@ test('enchère : surenchère, remboursement, vente, prix moyen', async () => {
   const m = await game.market();
   assert.equal(m.auctions.length, 0);
   assert.equal(m.prices[id].avg, 30);
-  assert.equal(await bal('seller'), bs + 29);
+  assert.equal(await bal('seller'), bs + 30);
   assert.ok((await game.me('bidder2')).cards[id] >= 1);
 });
 
@@ -102,4 +102,19 @@ test('enchère sans enchérisseur : la carte revient', async () => {
   await game.createAuction('carol', id, 5);
   advance(25 * H);
   assert.equal((await game.me('carol')).cards[id], n);
+});
+
+test('enchères : durée au choix, 5 max, sans frais', async () => {
+  const { game, store, advance } = setup();
+  await game.register('dave', 'secret1'); await game.register('erin', 'secret1');
+  const u = await store.get('user:dave'); u.cards = { simplon: 10 }; await store.set('user:dave', u);
+  const e = await store.get('user:erin'); e.navigos = 50; await store.set('user:erin', e);
+  await assert.rejects(game.createAuction('dave', 'simplon', 5, 12345), /Durée/);
+  const { auction } = await game.createAuction('dave', 'simplon', 5, 10 * 60 * 1000);
+  assert.equal(auction.endsAt - auction.createdAt, 600000);
+  for (let i = 0; i < 4; i++) await game.createAuction('dave', 'simplon', 5, H);
+  await assert.rejects(game.createAuction('dave', 'simplon', 5, H), /Maximum 5/);
+  await game.bid('erin', auction.id, 20);
+  advance(11 * 60 * 1000);
+  assert.equal((await game.me('dave')).navigos, 20);
 });

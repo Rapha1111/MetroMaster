@@ -34,6 +34,7 @@ function toast(msg, kind = '') {
 async function act(fn) { try { return await fn(); } catch (e) { toast(e.message, 'err'); } }
 
 // ---------- helpers ----------
+const DURS = [[600000, '10 minutes'], [3600000, '1 heure'], [21600000, '6 heures'], [43200000, '12 heures'], [86400000, '24 heures']];
 const RAR = {}; const ST = {};
 const rar = (id) => RAR[id];
 const stationOf = (id) => ST[id];
@@ -202,26 +203,33 @@ function viewLines(v) {
 function viewAuctions(v) {
   if (!S.market) { v.innerHTML = '<div class="spinner"></div>'; loadMarket().then(() => S.tab === 'auctions' && renderView()); return; }
   const me = S.user.name.toLowerCase();
+  const isMine = (a) => a.seller.toLowerCase() === me;
+  const isLeading = (a) => a.bid?.user.toLowerCase() === me;
+  const hasBid = (a) => !isMine(a) && (isLeading(a) || (a.bidders || []).some((n) => n.toLowerCase() === me));
+  const mineN = S.market.auctions.filter(isMine).length, posN = S.market.auctions.filter(hasBid).length;
   let list = S.market.auctions.slice();
+  if (S.aucTab === 'mine') list = list.filter(isMine);
+  if (S.aucTab === 'pos') list = list.filter(hasBid);
   const q = S.aucQ.toLowerCase();
-  if (S.aucTab === 'mine') list = list.filter((a) => a.seller.toLowerCase() === me || a.bid?.user.toLowerCase() === me);
   if (q) list = list.filter((a) => stationOf(a.stationId).name.toLowerCase().includes(q));
   list.sort((a, b) => a.endsAt - b.endsAt);
+  const tab = (k, l) => `<button data-auc="${k}" class="${S.aucTab === k ? 'active' : ''}">${l}</button>`;
+  const empty = { all: 'Aucune enchère en cours.', mine: "Tu n'as aucune enchère en cours. Pour vendre une gare, ouvre-la depuis l'onglet Collection.", pos: "Tu n'as enchéri sur aucune gare pour l'instant." }[S.aucTab];
   v.innerHTML = `<div class="section-title" style="margin-top:4px"><h2>Enchères</h2></div>
-  <div class="tabs" style="max-width:360px"><button data-auc="all" class="${S.aucTab === 'all' ? 'active' : ''}">En cours (${S.market.auctions.length})</button><button data-auc="mine" class="${S.aucTab === 'mine' ? 'active' : ''}">Mes enchères</button></div>
+  <div class="tabs">${tab('all', `En cours (${S.market.auctions.length})`)}${tab('mine', `Mes enchères (${mineN}/${S.market.maxActive})`)}${tab('pos', `Mes positions (${posN})`)}</div>
   <div class="toolbar" style="margin:10px 0"><input id="aq" type="search" placeholder="Chercher une gare…" value="${esc(S.aucQ)}"></div>
   <div class="auclist">${list.length ? list.map((a) => {
-    const mine = a.seller.toLowerCase() === me, leading = a.bid?.user.toLowerCase() === me, pr = marketPrice(a.stationId);
+    const mine = isMine(a), leading = isLeading(a), pr = marketPrice(a.stationId), bidder = hasBid(a);
     return `<div class="panel auc">${cardHTML(a.stationId, { attr: 'data-none' })}
       <div class="meta"><span class="muted">par ${esc(a.seller)}${mine ? ' (toi)' : ''}</span>
-        <span>${a.bid ? `Enchère actuelle ${navi(a.bid.amount)}` : `Mise de départ ${navi(a.minPrice)}`}</span>
+        <span>${a.bid ? `Enchère actuelle ${navi(a.bid.amount)}${mine ? ` par ${esc(a.bid.user)}` : ''}` : `Mise de départ ${navi(a.minPrice)}`}</span>
         <span class="muted">${a.bidCount} enchère${a.bidCount > 1 ? 's' : ''} · ⏱ <b data-end="${a.endsAt}">${left(a.endsAt - now())}</b></span>
         <span class="muted">Prix moyen : ${pr ? `${navi(pr.avg)} <small>(${pr.count} vente${pr.count > 1 ? 's' : ''})</small>` : 'aucune vente'}</span>
-        <div>${leading ? '<span class="tag ok">Tu mènes</span>' : ''}${a.bid && !leading && S.aucTab === 'mine' && !mine ? '' : ''}</div>
-        <div class="actions">${mine ? (a.bid ? '<span class="tag">Enchère en cours</span>' : `<button class="btn small danger" data-cancel="${a.id}">Annuler</button>`) : `<button class="btn small primary" data-bid="${a.id}">${leading ? 'Surenchérir' : 'Enchérir'}</button>`}</div>
+        <div>${leading ? '<span class="tag ok">🥇 Tu es en tête</span>' : bidder ? '<span class="tag warn">Tu as été dépassé</span>' : ''}</div>
+        <div class="actions">${mine ? (a.bid ? '<span class="tag">Enchère en cours</span>' : `<button class="btn small danger" data-cancel="${a.id}">Annuler</button>`) : `<button class="btn small primary" data-bid="${a.id}">${leading ? 'Surenchérir' : bidder ? 'Reprendre la tête' : 'Enchérir'}</button>`}</div>
       </div></div>`;
-  }).join('') : `<div class="empty" style="grid-column:1/-1">${S.aucTab === 'mine' ? 'Tu ne participes à aucune enchère.' : 'Aucune enchère en cours. Lance la première !'}</div>`}</div>
-  <p class="hint" style="margin-top:14px">Pour vendre une gare, ouvre-la depuis l'onglet Collection. Une enchère dure 24 h. ${Math.round(S.market.feeRate * 100)} % de frais sont prélevés au vendeur sur chaque vente. Une surenchère doit dépasser l'actuelle d'au moins ${Math.round(S.market.minRaise * 100)} %.</p>`;
+  }).join('') : `<div class="empty" style="grid-column:1/-1">${empty}</div>`}</div>
+  <p class="hint" style="margin-top:14px">Aucun frais. Tu peux avoir ${S.market.maxActive} enchères en cours au maximum. Une surenchère doit dépasser l'actuelle d'au moins ${Math.round(S.market.minRaise * 100)} %.</p>`;
 }
 
 function viewMe(v) {
@@ -267,7 +275,9 @@ function sellModal(id) {
   modal(`<h3 style="margin:6px 40px 12px 0">Mettre aux enchères</h3><div style="max-width:170px;margin:0 auto 12px">${cardHTML(id, { attr: 'data-none' })}</div>
     <p class="hint" style="text-align:center">${pr ? `Prix moyen de vente : <b>${fmt(pr.avg)} N</b> (de ${pr.min} à ${pr.max}, ${pr.count} vente${pr.count > 1 ? 's' : ''})` : 'Aucune vente connue pour cette gare.'}</p>
     <label for="mp">Prix minimum (Navigos)</label><input id="mp" type="number" inputmode="numeric" min="1" value="${suggested}">
-    <p class="hint">Durée : 24 h · Frais : ${Math.round((S.market?.feeRate ?? 0.05) * 100)} % prélevés sur la vente. La carte est mise de côté jusqu'à la fin de l'enchère.</p>
+    <label for="dur">Durée de l'enchère</label>
+    <select id="dur">${DURS.map(([ms, l]) => `<option value="${ms}" ${ms === 86400000 ? 'selected' : ''}>${l}</option>`).join('')}</select>
+    <p class="hint">Aucun frais. Tu peux avoir ${S.market?.maxActive ?? 5} enchères en cours au maximum. La carte est mise de côté jusqu'à la fin de l'enchère.</p>
     <button class="btn primary block" data-confirm-sell="${id}">Lancer l'enchère</button>`);
 }
 
@@ -379,8 +389,8 @@ document.addEventListener('click', async (e) => {
   }
   if (d.sell !== undefined && d.sell) return sellModal(d.sell);
   if (d.confirmSell) {
-    const r = await act(() => api('/auctions', { id: d.confirmSell, minPrice: $('#mp').value }));
-    if (r) { setUser(r.user); closeModal(); toast('Enchère lancée pour 24 h !', 'ok'); S.tab = 'auctions'; S.aucTab = 'mine'; await loadMarket(); render(); } return;
+    const r = await act(() => api('/auctions', { id: d.confirmSell, minPrice: $('#mp').value, duration: Number($('#dur').value) }));
+    if (r) { setUser(r.user); closeModal(); toast('Enchère lancée !', 'ok'); S.tab = 'auctions'; S.aucTab = 'mine'; await loadMarket(); render(); } return;
   }
   if (d.bid) return bidModal(Number(d.bid));
   if (d.confirmBid) {
