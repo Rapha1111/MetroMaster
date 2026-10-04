@@ -6,7 +6,7 @@ const S = {
   token: null, user: null, cat: null, market: null, skew: 0,
   tab: 'home', auth: 'login',
   col: { q: '', rarity: 'all', net: 'all', line: 'all', own: 'all', sort: 'rarity', limit: 60 },
-  openLines: new Set(), aucTab: 'all', aucQ: '',
+  sel: { on: false, items: {} }, openLines: new Set(), aucTab: 'all', aucQ: '',
 };
 try { S.token = localStorage.getItem('mm_token'); S.tab = localStorage.getItem('mm_tab') || 'home'; } catch {}
 
@@ -50,10 +50,12 @@ const bullet = (l, lg) => {
 };
 const navi = (n) => `<span class="price"><span class="navigo">N</span>${fmt(n)}</span>`;
 
-function cardHTML(id, { qty = 0, locked = false, attr = 'data-station' } = {}) {
+function cardHTML(id, { qty = 0, locked = false, attr = 'data-station', star = false, sel = 0 } = {}) {
   const st = stationOf(id), r = rar(st.rarity);
-  return `<div class="card r-${st.rarity} ${locked ? 'locked' : ''}" ${locked ? '' : `${attr}="${id}"`}>
-    <div class="card-top"><span>${r.label}</span>${qty > 1 ? `<span class="qty">×${qty}</span>` : ''}</div>
+  const fav = star && S.user.favs && S.user.favs[id];
+  return `<div class="card r-${st.rarity} ${locked ? 'locked' : ''} ${sel ? 'selected' : ''}" ${locked ? '' : `${attr}="${id}"`}>
+    <div class="card-top"><span>${r.label}</span><span class="topr">${qty > 1 ? `<span class="qty">×${qty}</span>` : ''}${star ? `<button class="star ${fav ? 'on' : ''}" data-fav="${id}" aria-label="Favori" title="Favori">${fav ? '★' : '☆'}</button>` : ''}</span></div>
+    ${sel ? `<div class="selbadge">−${sel}</div>` : ''}
     <div class="art">${bullet(st.lines[0])}</div>
     <div class="plaque"><span>${esc(st.name)}</span></div>
     <div class="bullets">${st.lines.map((l) => bullet(l)).join('')}</div>
@@ -155,6 +157,7 @@ function viewCards(v) {
     if (f.own === 'own' && !owned()[s.id]) return false;
     if (f.own === 'missing' && owned()[s.id]) return false;
     if (f.own === 'dup' && !(owned()[s.id] > 1)) return false;
+    if (f.own === 'fav' && !(S.user.favs && S.user.favs[s.id])) return false;
     if (f.q && !s.name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').includes(f.q.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''))) return false;
     return true;
   });
@@ -164,19 +167,23 @@ function viewCards(v) {
     qty: (a, b) => (owned()[b.id] || 0) - (owned()[a.id] || 0) || a.name.localeCompare(b.name, 'fr'),
   }[f.sort];
   list.sort(by);
-  const dups = Object.values(owned()).reduce((a, q) => a + Math.max(0, q - 1), 0);
+  const favs = S.user.favs || {};
+  const dups = Object.entries(owned()).reduce((a, [id, q]) => a + (favs[id] ? 0 : Math.max(0, q - 1)), 0);
+  const sel = S.sel, selN = Object.values(sel.items).reduce((a, b) => a + b, 0);
   v.innerHTML = `
   <div class="section-title" style="margin-top:4px"><h2>Collection <span class="muted" style="font-size:15px">${uniqueOwned()}/${Object.keys(ST).length}</span></h2>
-    ${dups ? `<button class="btn small danger" data-act="scrapDups">Défausser ${dups} doublon${dups > 1 ? 's' : ''}</button>` : ''}</div>
+    <span style="display:flex;gap:8px">${sel.on ? '' : (dups ? `<button class="btn small danger" data-act="scrapDups">Défausser ${dups} doublon${dups > 1 ? 's' : ''}</button>` : '')}<button class="btn small ${sel.on ? 'primary' : ''}" data-act="selToggle">${sel.on ? 'Terminer' : 'Sélectionner'}</button></span></div>
   <div class="toolbar">
     <div class="row"><input id="q" type="search" placeholder="Chercher une gare…" value="${esc(f.q)}">
       <select id="sort" style="width:auto"><option value="rarity" ${f.sort === 'rarity' ? 'selected' : ''}>Rareté</option><option value="name" ${f.sort === 'name' ? 'selected' : ''}>A → Z</option><option value="qty" ${f.sort === 'qty' ? 'selected' : ''}>Quantité</option></select></div>
-    <div class="chips">${[['all', 'Toutes'], ['own', 'Possédées'], ['missing', 'Manquantes'], ['dup', 'Doublons']].map(([k, l]) => `<button class="chip ${f.own === k ? 'active' : ''}" data-own="${k}">${l}</button>`).join('')}</div>
+    <div class="chips">${[['all', 'Toutes'], ['own', 'Possédées'], ['missing', 'Manquantes'], ['dup', 'Doublons'], ['fav', '★ Favoris']].map(([k, l]) => `<button class="chip ${f.own === k ? 'active' : ''}" data-own="${k}">${l}</button>`).join('')}</div>
     <div class="chips"><button class="chip ${f.rarity === 'all' ? 'active' : ''}" data-rarity="all">Toutes raretés</button>${S.cat.rarities.map((r) => `<button class="chip ${f.rarity === r.id ? 'active' : ''}" data-rarity="${r.id}"><i style="width:9px;height:9px;border-radius:50%;background:${r.color}"></i>${r.label}</button>`).join('')}</div>
     <div class="chips"><button class="chip ${f.net === 'all' ? 'active' : ''}" data-net="all">Tous réseaux</button>${S.cat.networks.map((n) => `<button class="chip ${f.net === n.id ? 'active' : ''}" data-net="${n.id}">${n.label}</button>`).join('')}</div>
     <div class="chips"><button class="chip ${f.line === 'all' ? 'active' : ''}" data-line="all">Toutes lignes</button>${Object.keys(S.cat.lines).filter((l) => f.net === 'all' || S.cat.lines[l].network === f.net).map((l) => `<button class="chip ${f.line === l ? 'active' : ''}" data-line="${l}" style="padding:4px 8px">${bullet(l)}</button>`).join('')}</div>
   </div>
-  <div class="cards" id="grid">${list.length ? list.slice(0, f.limit).map((s) => cardHTML(s.id, { qty: owned()[s.id] || 0, locked: !owned()[s.id], attr: 'data-station' })).join('') : '<div class="empty" style="grid-column:1/-1">Aucune gare ne correspond.</div>'}</div>
+  <div class="cards" id="grid">${list.length ? list.slice(0, f.limit).map((s) => cardHTML(s.id, { qty: owned()[s.id] || 0, locked: !owned()[s.id], attr: 'data-station', star: Boolean(owned()[s.id]), sel: sel.items[s.id] || 0 })).join('') : '<div class="empty" style="grid-column:1/-1">Aucune gare ne correspond.</div>'}</div>
+  ${sel.on ? `<div class="selbar"><div><b>${selN}</b> carte${selN > 1 ? 's' : ''} · <span class="price">+${selN * 5} <span class="navigo">N</span></span></div>
+    <div style="display:flex;gap:8px"><button class="btn small" data-act="selDups">Doublons</button><button class="btn small" data-act="selClear" ${selN ? '' : 'disabled'}>Vider</button><button class="btn small danger" data-act="selScrap" ${selN ? '' : 'disabled'}>Défausser</button></div></div>` : ''}
   ${list.length > f.limit ? `<div style="text-align:center;margin-top:16px"><button class="btn" data-more>Afficher plus (${list.length - f.limit} restantes)</button></div>` : `<p class="hint" style="text-align:center;margin-top:14px">${list.length} gare${list.length > 1 ? 's' : ''}</p>`}`;
 }
 
@@ -394,6 +401,26 @@ document.addEventListener('click', async (e) => {
     const r = await act(() => api('/redeem', { code: $('#code').value }));
     if (r) { setUser(r.user); closeModal(); toast(`+${r.reward} Navigos !`, 'ok'); render(); } return;
   }
+  if (d.fav) {
+    const r = await act(() => api('/fav', { id: d.fav }));
+    if (r) { setUser(r.user); if (r.fav && S.sel.items[d.fav]) delete S.sel.items[d.fav]; renderView(); toast(r.fav ? '★ Ajoutée aux favoris' : 'Retirée des favoris'); } return;
+  }
+  if (d.act === 'selToggle') { S.sel = { on: !S.sel.on, items: {} }; return renderView(); }
+  if (d.act === 'selClear') { S.sel.items = {}; return renderView(); }
+  if (d.act === 'selDups') {
+    const fv = S.user.favs || {};
+    S.sel.items = {};
+    for (const [id, q] of Object.entries(owned())) if (q > 1 && !fv[id]) S.sel.items[id] = q - 1;
+    return renderView();
+  }
+  if (d.act === 'selScrap') {
+    const items = Object.entries(S.sel.items).map(([id, qty]) => ({ id, qty }));
+    const n = items.reduce((a, b) => a + b.qty, 0);
+    const lastCopies = items.filter((i) => i.qty >= owned()[i.id]).length;
+    if (!confirm(`Défausser ${n} carte${n > 1 ? 's' : ''} pour ${n * 5} Navigos ?${lastCopies ? `\n⚠️ ${lastCopies} gare${lastCopies > 1 ? 's' : ''} ser${lastCopies > 1 ? 'ont' : 'a'} définitivement retirée${lastCopies > 1 ? 's' : ''} de ta collection (dernier exemplaire).` : ''}`)) return;
+    const r = await act(() => api('/scrap-many', { items }));
+    if (r) { setUser(r.user); S.sel.items = {}; toast(`+${r.gain} Navigos (${r.count} cartes défaussées)`, 'ok'); render(); } return;
+  }
   if (d.act === 'logout') return logout();
   if (d.act === 'buyPack') return openPack('/buy-pack');
   if (d.act === 'scrapDups') {
@@ -428,6 +455,12 @@ document.addEventListener('click', async (e) => {
     if (r) { setUser(r.user); toast('Enchère annulée, la gare est revenue.', 'ok'); await loadMarket(); render(); } return;
   }
   if (d.gotoAuc !== undefined) { closeModal(); S.tab = 'auctions'; await loadMarket(); return render(); }
+  if (d.station && S.sel.on && S.tab === 'cards') {
+    if ((S.user.favs || {})[d.station]) return toast('★ Favorite : retire l\'étoile pour pouvoir la défausser.', 'err');
+    const q = owned()[d.station] || 0, cur = S.sel.items[d.station] || 0;
+    if (cur >= q) delete S.sel.items[d.station]; else S.sel.items[d.station] = cur + 1;
+    return renderView();
+  }
   if (d.station) return detail(d.station);
 });
 

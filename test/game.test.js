@@ -138,3 +138,18 @@ test('code secret : 500 Navigos, une seule fois par compte', async () => {
   assert.equal(r.user.navigos, 500);
   await assert.rejects(game.redeem('coder', 'ILOVEPARIS'), /déjà/);
 });
+
+test('favoris et défausse multiple', async () => {
+  const { game, store } = setup();
+  await game.register('multi', 'secret1');
+  const u = await store.get('user:multi'); u.cards = { simplon: 3, vavin: 2, alesia: 1 }; await store.set('user:multi', u);
+  await game.toggleFav('multi', 'vavin');
+  await assert.rejects(game.scrapMany('multi', [{ id: 'vavin', qty: 1 }]), /favori/);
+  await assert.rejects(game.scrapMany('multi', [{ id: 'simplon', qty: 5 }]), /Pas assez/);
+  const r = await game.scrapMany('multi', [{ id: 'simplon', qty: 2 }, { id: 'alesia', qty: 1 }]);
+  assert.equal(r.gain, 15);
+  assert.deepEqual(Object.keys(r.user.cards).sort(), ['simplon', 'vavin']);
+  await game.toggleFav('multi', 'vavin'); // retire le favori
+  assert.equal((await game.me('multi')).favs.vavin, undefined);
+  await assert.rejects(game.toggleFav('multi', 'nation'), /ne possèdes pas/);
+});
